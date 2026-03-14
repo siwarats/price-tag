@@ -28,3 +28,7 @@ vendor/
 # OS
 .DS_Store
 Thumbs.db
+
+
+# Env
+.env
