@@ -11,16 +11,18 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const PRODUCTS_URL string = "https://api-o2o.lotuss.com/lotuss-mobile-bff/product/v4/products"
 
 type Filter struct {
-	AttributeCode string `bson:"attribute_code"`
-	Label         string `bson:"label"`
-	OptionLabel   string `bson:"option_label"`
-	OptionValue   string `bson:"option_value"`
+	AttributeCode string    `bson:"attribute_code"`
+	Label         string    `bson:"label"`
+	OptionLabel   string    `bson:"option_label"`
+	OptionValue   string    `bson:"option_value"`
+	UpdatedAt     time.Time `bson:"updated_at"`
 }
 
 type filterRaw struct {
@@ -55,7 +57,7 @@ func (l *lotuss) runProducts() {
 	}
 	log.Printf("level-1 categories: %d", len(level1))
 
-	sem := make(chan struct{}, 3)
+	sem := make(chan struct{}, 10)
 	var wg sync.WaitGroup
 
 	for _, cat := range level1 {
@@ -90,57 +92,67 @@ func (l *lotuss) scrapeCategory(categoryID int) {
 
 		log.Printf("[cat=%d page=%d] got %d products, %d filters", categoryID, page, len(products), len(filters))
 
-		// concurrent upsert products (sem=5)
-		prodSem := make(chan struct{}, 5)
-		var prodWg sync.WaitGroup
+		// bulk upsert products in batches of 50
+		var productModels []mongo.WriteModel
 		for _, p := range products {
 			sku, _ := p["sku"]
 			if sku == nil {
 				continue
 			}
-			prodWg.Add(1)
-			prodSem <- struct{}{}
-			go func(doc map[string]interface{}, s interface{}) {
-				defer prodWg.Done()
-				defer func() { <-prodSem }()
-				ctx := context.Background()
-				filter := bson.M{"sku": s}
-				opts := options.Update().SetUpsert(true)
-				if _, err := productCol.UpdateOne(ctx, filter, bson.M{"$set": doc}, opts); err != nil {
-					log.Printf("failed to upsert product sku=%v: %v", s, err)
-				}
-			}(p, sku)
+			p["category_id"] = categoryID
+			p["updated_at"] = time.Now()
+			productModels = append(productModels, mongo.NewUpdateOneModel().
+				SetFilter(bson.M{"sku": sku}).
+				SetUpdate(bson.M{
+					"$set":         p,
+					"$setOnInsert": bson.M{"created_at": time.Now()},
+				}).
+				SetUpsert(true))
 		}
-		prodWg.Wait()
+		if err := bulkWrite(context.Background(), productCol, productModels, 50); err != nil {
+			log.Printf("[cat=%d page=%d] bulk upsert products error: %v", categoryID, page, err)
+		}
 
-		// concurrent upsert filters (sem=5)
-		filterSem := make(chan struct{}, 5)
-		var filterWg sync.WaitGroup
+		// bulk upsert filters in batches of 50
+		var filterModels []mongo.WriteModel
 		for _, f := range filters {
-			filterWg.Add(1)
-			filterSem <- struct{}{}
-			go func(fl Filter) {
-				defer filterWg.Done()
-				defer func() { <-filterSem }()
-				ctx := context.Background()
-				filter := bson.M{"option_value": fl.OptionValue}
-				opts := options.Replace().SetUpsert(true)
-				if _, err := filterCol.ReplaceOne(ctx, filter, fl, opts); err != nil {
-					log.Printf("failed to upsert filter %s/%s: %v", fl.AttributeCode, fl.OptionValue, err)
-				}
-			}(f)
+			fl := f
+			fl.UpdatedAt = time.Now()
+			filterModels = append(filterModels, mongo.NewUpdateOneModel().
+				SetFilter(bson.M{"option_value": fl.OptionValue}).
+				SetUpdate(bson.M{
+					"$set":         fl,
+					"$setOnInsert": bson.M{"created_at": time.Now()},
+				}).
+				SetUpsert(true))
 		}
-		filterWg.Wait()
+		if err := bulkWrite(context.Background(), filterCol, filterModels, 50); err != nil {
+			log.Printf("[cat=%d page=%d] bulk upsert filters error: %v", categoryID, page, err)
+		}
 
-		// random sleep 199–523ms before next page
-		sleep := time.Duration(199+rand.Intn(325)) * time.Millisecond
+		// random sleep 97–149ms before next page
+		sleep := time.Duration(97+rand.Intn(52)) * time.Millisecond
 		time.Sleep(sleep)
 		page++
 	}
 }
 
+func bulkWrite(ctx context.Context, col *mongo.Collection, models []mongo.WriteModel, batchSize int) error {
+	opts := options.BulkWrite().SetOrdered(false)
+	for i := 0; i < len(models); i += batchSize {
+		end := i + batchSize
+		if end > len(models) {
+			end = len(models)
+		}
+		if _, err := col.BulkWrite(ctx, models[i:end], opts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (l *lotuss) fetchProducts(categoryID, page int) ([]map[string]interface{}, []Filter, error) {
-	url := fmt.Sprintf("%s?category_id=%d&page=%d&limit=15", PRODUCTS_URL, categoryID, page)
+	url := fmt.Sprintf("%s?category_id=%d&page=%d&limit=50", PRODUCTS_URL, categoryID, page)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create request: %w", err)

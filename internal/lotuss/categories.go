@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,9 +26,10 @@ type Category struct {
 	IsOnDemand int        `json:"is_on_demand" bson:"is_on_demand"`
 	IsInMenu   int        `json:"is_in_menu" bson:"is_in_menu"`
 	IsOnline   int        `json:"is_online" bson:"is_online"`
-	Level      int        `json:"level" bson:"level"`
-	Path       string     `json:"path" bson:"path"`
-	Children   []Category `json:"children" bson:"-"`
+	Level     int        `json:"level" bson:"level"`
+	Path      string     `json:"path" bson:"path"`
+	Children  []Category `json:"children" bson:"-"`
+	UpdatedAt time.Time  `json:"-" bson:"updated_at"`
 }
 
 type categoriesResponse struct {
@@ -72,6 +74,20 @@ func flattenCategories(categories []Category) []Category {
 	return flat
 }
 
+func (l *lotuss) runCategories() {
+	categories, err := l.fetchCategories()
+	if err != nil {
+		log.Fatalf("failed to fetch categories: %v", err)
+	}
+
+	flat := flattenCategories(categories)
+	log.Printf("total categories: %d", len(flat))
+
+	col := l.db.Collection(CATEGORY_COLLECTION)
+	l.upsertCategoriesConcurrent(col, flat, 10)
+	log.Println("done inserting categories")
+}
+
 func (l *lotuss) upsertCategoriesConcurrent(col *mongo.Collection, categories []Category, concurrency int) {
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
@@ -83,10 +99,15 @@ func (l *lotuss) upsertCategoriesConcurrent(col *mongo.Collection, categories []
 			defer wg.Done()
 			defer func() { <-sem }()
 
+			c.UpdatedAt = time.Now()
 			ctx := context.Background()
 			filter := bson.M{"id": c.ID}
-			opts := options.Replace().SetUpsert(true)
-			if _, err := col.ReplaceOne(ctx, filter, c, opts); err != nil {
+			update := bson.M{
+				"$set":         c,
+				"$setOnInsert": bson.M{"created_at": time.Now()},
+			}
+			opts := options.Update().SetUpsert(true)
+			if _, err := col.UpdateOne(ctx, filter, update, opts); err != nil {
 				log.Printf("failed to upsert category id=%d: %v", c.ID, err)
 			} else {
 				log.Printf("upserted category id=%d name=%s level=%d", c.ID, c.Name, c.Level)

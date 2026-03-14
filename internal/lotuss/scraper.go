@@ -39,19 +39,8 @@ func NewLotuss(cfg *pkg.Config) *lotuss {
 }
 
 func (l *lotuss) Run() {
-	// categories, err := l.fetchCategories()
-	// if err != nil {
-	// 	log.Fatalf("failed to fetch categories: %v", err)
-	// }
-
-	// flat := flattenCategories(categories)
-	// log.Printf("total categories: %d", len(flat))
-
-	// col := l.db.Collection(CATEGORY_COLLECTION)
-	// l.upsertCategoriesConcurrent(col, flat, 10)
-	// log.Println("done inserting categories")
-
+	// l.runCategories()
 	l.runProducts()
-	// l.runImages()
-	// l.runCategoryImages()
+	l.runImages()
+	l.runCategoryImages()
 }
