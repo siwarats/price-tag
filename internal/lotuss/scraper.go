@@ -18,7 +18,8 @@ const (
 )
 
 type lotuss struct {
-	db *mongo.Database
+	db                 *mongo.Database
+	skipExistingImages bool
 }
 
 func NewLotuss(cfg *pkg.Config) *lotuss {
@@ -31,7 +32,10 @@ func NewLotuss(cfg *pkg.Config) *lotuss {
 	if err := client.Ping(ctx, nil); err != nil {
 		log.Fatalf("failed to ping MongoDB: %v", err)
 	}
-	return &lotuss{db: client.Database(DB_NAME)}
+	return &lotuss{
+		db:                 client.Database(DB_NAME),
+		skipExistingImages: cfg.SKIP_EXISTING_IMAGES,
+	}
 }
 
 func (l *lotuss) Run() {
@@ -47,5 +51,6 @@ func (l *lotuss) Run() {
 	// l.upsertCategoriesConcurrent(col, flat, 10)
 	// log.Println("done inserting categories")
 
-	l.runProducts()
+	// l.runProducts()
+	l.runImages()
 }
