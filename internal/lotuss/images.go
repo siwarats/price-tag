@@ -54,6 +54,42 @@ func (l *lotuss) runImages() {
 	log.Println("done downloading images")
 }
 
+func (l *lotuss) runCategoryImages() {
+	ctx := context.Background()
+	cur, err := l.db.Collection(CATEGORY_COLLECTION).Find(ctx, bson.M{},
+		options.Find().SetBatchSize(100).SetProjection(bson.M{"image": 1}))
+	if err != nil {
+		log.Fatalf("failed to query categories: %v", err)
+	}
+	defer cur.Close(ctx)
+
+	sem := make(chan struct{}, 10)
+	var wg sync.WaitGroup
+
+	for cur.Next(ctx) {
+		var doc map[string]interface{}
+		if err := cur.Decode(&doc); err != nil {
+			continue
+		}
+
+		imgURL, _ := doc["image"].(string)
+		if imgURL == "" {
+			continue
+		}
+
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(u string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			downloadImage(u, l.skipExistingImages)
+		}(imgURL)
+	}
+
+	wg.Wait()
+	log.Println("done downloading category images")
+}
+
 func downloadImage(rawURL string, skipExisting bool) {
 	u, err := url.Parse(rawURL)
 	if err != nil {

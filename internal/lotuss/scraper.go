@@ -51,6 +51,7 @@ func (l *lotuss) Run() {
 	// l.upsertCategoriesConcurrent(col, flat, 10)
 	// log.Println("done inserting categories")
 
-	// l.runProducts()
-	l.runImages()
+	l.runProducts()
+	// l.runImages()
+	// l.runCategoryImages()
 }
