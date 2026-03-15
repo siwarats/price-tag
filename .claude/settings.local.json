@@ -15,7 +15,8 @@
       "Bash(gh auth:*)",
       "Bash(gh repo:*)",
       "Bash(go test:*)",
-      "Bash(go vet:*)"
+      "Bash(go vet:*)",
+      "Bash(ls \"c:\\\\Users\\\\siwar\\\\Documents\\\\price-tag\\\\.claude\"\" 2>/dev/null || echo \"dir not found \")"
     ]
   }
 }
