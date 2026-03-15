@@ -1,4 +1,4 @@
 package entity
 
-type Pradock struct {
+type Product struct {
 }

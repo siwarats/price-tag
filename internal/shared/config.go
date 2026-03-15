@@ -12,6 +12,7 @@ type Config struct {
 	LOTUSS_SCRAPER_URL   string
 	SKIP_EXISTING_IMAGES bool
 	SCRAPER_LOTUSS_PORT  string
+	API_PORT             string
 }
 
 func NewConfig() *Config {
@@ -25,6 +26,7 @@ func NewConfig() *Config {
 		LOTUSS_SCRAPER_URL:   os.Getenv("LOTUSS_SCRAPER_URL"),
 		SKIP_EXISTING_IMAGES: os.Getenv("SKIP_EXISTING_IMAGES") == "true",
 		SCRAPER_LOTUSS_PORT:  os.Getenv("SCRAPER_LOTUSS_PORT"),
+		API_PORT:             os.Getenv("API_PORT"),
 	}
 
 	log.Printf("Config: %+v\n", cfg)
