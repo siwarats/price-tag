@@ -14,7 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func (l *lotuss) runImages() {
+func (l *Lotuss) RunImages() {
 	ctx := context.Background()
 	cur, err := l.db.Collection(PRODUCT_COLLECTION).Find(ctx, bson.M{},
 		options.Find().SetBatchSize(100).SetProjection(bson.M{"thumbnail": 1}))
@@ -54,7 +54,7 @@ func (l *lotuss) runImages() {
 	log.Println("done downloading images")
 }
 
-func (l *lotuss) runCategoryImages() {
+func (l *Lotuss) RunCategoryImages() {
 	ctx := context.Background()
 	cur, err := l.db.Collection(CATEGORY_COLLECTION).Find(ctx, bson.M{},
 		options.Find().SetBatchSize(100).SetProjection(bson.M{"image": 1}))

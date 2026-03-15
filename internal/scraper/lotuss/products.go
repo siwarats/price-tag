@@ -43,7 +43,7 @@ type productsResponse struct {
 	} `json:"data"`
 }
 
-func (l *lotuss) runProducts() {
+func (l *Lotuss) RunProducts() {
 	ctx := context.Background()
 	cur, err := l.db.Collection(CATEGORY_COLLECTION).Find(ctx, bson.M{"level": 1})
 	if err != nil {
@@ -74,7 +74,7 @@ func (l *lotuss) runProducts() {
 	log.Println("done scraping products")
 }
 
-func (l *lotuss) scrapeCategory(categoryID int) {
+func (l *Lotuss) scrapeCategory(categoryID int) {
 	productCol := l.db.Collection(PRODUCT_COLLECTION)
 	filterCol := l.db.Collection(FILTER_COLLECTION)
 
@@ -151,7 +151,7 @@ func bulkWrite(ctx context.Context, col *mongo.Collection, models []mongo.WriteM
 	return nil
 }
 
-func (l *lotuss) fetchProducts(categoryID, page int) ([]map[string]interface{}, []Filter, error) {
+func (l *Lotuss) fetchProducts(categoryID, page int) ([]map[string]interface{}, []Filter, error) {
 	url := fmt.Sprintf("%s?category_id=%d&page=%d&limit=50", PRODUCTS_URL, categoryID, page)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {

@@ -40,7 +40,7 @@ type categoriesResponse struct {
 	} `json:"data"`
 }
 
-func (l *lotuss) fetchCategories() ([]Category, error) {
+func (l *Lotuss) fetchCategories() ([]Category, error) {
 	req, err := http.NewRequest(http.MethodGet, CATEGORIES_URL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -74,7 +74,7 @@ func flattenCategories(categories []Category) []Category {
 	return flat
 }
 
-func (l *lotuss) runCategories() {
+func (l *Lotuss) RunCategories() {
 	categories, err := l.fetchCategories()
 	if err != nil {
 		log.Fatalf("failed to fetch categories: %v", err)
@@ -88,7 +88,7 @@ func (l *lotuss) runCategories() {
 	log.Println("done inserting categories")
 }
 
-func (l *lotuss) upsertCategoriesConcurrent(col *mongo.Collection, categories []Category, concurrency int) {
+func (l *Lotuss) upsertCategoriesConcurrent(col *mongo.Collection, categories []Category, concurrency int) {
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 
